@@ -31,6 +31,8 @@ function log_normal_cdf(x) {
  * @param {number} params.repos Total number of repos.
  * @param {number} params.stars The number of stars.
  * @param {number} params.followers The number of followers.
+ * @param {number} params.lines_changed Lines of code changed (added + removed).
+ * @param {number} params.github_actions Number of GitHub Actions runs triggered.
  * @returns {{ level: string, percentile: number }} The users rank.
  */
 function calculateRank({
@@ -43,6 +45,8 @@ function calculateRank({
   repos, // unused
   stars,
   followers,
+  lines_changed = 0,
+  github_actions = 0,
 }) {
   const COMMITS_MEDIAN = all_commits ? 1000 : 250,
     COMMITS_WEIGHT = 2;
@@ -56,6 +60,10 @@ function calculateRank({
     STARS_WEIGHT = 4;
   const FOLLOWERS_MEDIAN = 10,
     FOLLOWERS_WEIGHT = 1;
+  const LINES_CHANGED_MEDIAN = 50000,
+    LINES_CHANGED_WEIGHT = 2;
+  const GITHUB_ACTIONS_MEDIAN = 200,
+    GITHUB_ACTIONS_WEIGHT = 1;
 
   const TOTAL_WEIGHT =
     COMMITS_WEIGHT +
@@ -63,7 +71,9 @@ function calculateRank({
     ISSUES_WEIGHT +
     REVIEWS_WEIGHT +
     STARS_WEIGHT +
-    FOLLOWERS_WEIGHT;
+    FOLLOWERS_WEIGHT +
+    LINES_CHANGED_WEIGHT +
+    GITHUB_ACTIONS_WEIGHT;
 
   const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
   const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
@@ -75,7 +85,11 @@ function calculateRank({
       ISSUES_WEIGHT * exponential_cdf(issues / ISSUES_MEDIAN) +
       REVIEWS_WEIGHT * exponential_cdf(reviews / REVIEWS_MEDIAN) +
       STARS_WEIGHT * log_normal_cdf(stars / STARS_MEDIAN) +
-      FOLLOWERS_WEIGHT * log_normal_cdf(followers / FOLLOWERS_MEDIAN)) /
+      FOLLOWERS_WEIGHT * log_normal_cdf(followers / FOLLOWERS_MEDIAN) +
+      LINES_CHANGED_WEIGHT *
+        log_normal_cdf(lines_changed / LINES_CHANGED_MEDIAN) +
+      GITHUB_ACTIONS_WEIGHT *
+        exponential_cdf(github_actions / GITHUB_ACTIONS_MEDIAN)) /
       TOTAL_WEIGHT;
 
   const level = LEVELS[THRESHOLDS.findIndex((t) => rank * 100 <= t)];

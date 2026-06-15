@@ -351,6 +351,10 @@ const statCardLocales = ({ name, apostrophe }) => {
       "sr-latn": "Doprinosi (prošla godina)",
       no: "Bidro til (i fjor)",
     },
+    "statcard.lines-changed": {
+      en: "Code line changes",
+      fr: "Modifications de lignes de code",
+    },
     "statcard.lines-added": {
       en: "Lines of code added",
       fr: "Lignes de code ajoutées",

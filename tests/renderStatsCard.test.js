@@ -135,13 +135,38 @@ describe("Test renderStatsCard", () => {
       show: ["lines_added", "lines_removed", "github_actions"],
     });
 
-    expect(getByTestId(document.body, "lines_added").textContent).toBe("12.3k");
-    expect(getByTestId(document.body, "lines_removed").textContent).toBe(
-      "6.8k",
-    );
+    const linesAdded = getByTestId(document.body, "lines_added");
+    const linesRemoved = getByTestId(document.body, "lines_removed");
+
+    // Rounded value, signed prefix and GitHub diff colors.
+    expect(linesAdded.textContent).toBe("+12.3k");
+    expect(linesAdded).toHaveStyle("fill: #2da44e");
+    expect(linesRemoved.textContent).toBe("-6.8k");
+    expect(linesRemoved).toHaveStyle("fill: #cf222e");
     expect(getByTestId(document.body, "github_actions").textContent).toBe(
       "600",
     );
+  });
+
+  it("should show combined lines changed on a single line", () => {
+    document.body.innerHTML = renderStatsCard(stats, {
+      show: ["lines_changed"],
+    });
+
+    const linesChanged = getByTestId(document.body, "lines_changed");
+    expect(linesChanged.textContent).toBe("+12.3k -6.8k");
+
+    // Each part keeps its own GitHub diff color via tspans.
+    const tspans = linesChanged.getElementsByTagName("tspan");
+    expect(tspans).toHaveLength(2);
+    expect(tspans[0]).toHaveStyle("fill: #2da44e");
+    expect(tspans[1]).toHaveStyle("fill: #cf222e");
+
+    // Individual lines are not rendered when only the combined stat is shown.
+    expect(queryByTestId(document.body, "lines_added")).not.toBeInTheDocument();
+    expect(
+      queryByTestId(document.body, "lines_removed"),
+    ).not.toBeInTheDocument();
   });
 
   it("should hide_rank", () => {

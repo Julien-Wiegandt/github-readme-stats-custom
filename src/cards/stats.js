@@ -17,6 +17,10 @@ const RANK_CARD_DEFAULT_WIDTH = 450;
 const RANK_ONLY_CARD_MIN_WIDTH = 290;
 const RANK_ONLY_CARD_DEFAULT_WIDTH = 290;
 
+// GitHub's diff colors, used to highlight added/removed lines of code.
+const LINES_ADDED_COLOR = "#2da44e";
+const LINES_REMOVED_COLOR = "#cf222e";
+
 /**
  * Long locales that need more space for text. Keep sorted alphabetically.
  *
@@ -66,6 +70,9 @@ const LONG_LOCALES = [
  * @param {boolean} params.bold Whether to bold the label.
  * @param {string} params.numberFormat The format of numbers on card.
  * @param {number=} params.numberPrecision The precision of numbers on card.
+ * @param {string=} params.valueColor Override color for the value text.
+ * @param {string=} params.valuePrefix String prepended to the value (e.g. "+" or "-").
+ * @param {string=} params.valueMarkup Pre-rendered SVG markup used as the value content (overrides value formatting).
  * @returns {string} The stats card text item SVG object.
  */
 const createTextNode = ({
@@ -80,6 +87,9 @@ const createTextNode = ({
   bold,
   numberFormat,
   numberPrecision,
+  valueColor,
+  valuePrefix,
+  valueMarkup,
 }) => {
   const precision =
     typeof numberPrecision === "number" && !isNaN(numberPrecision)
@@ -89,6 +99,9 @@ const createTextNode = ({
     numberFormat.toLowerCase() === "long" || id === "prs_merged_percentage"
       ? value
       : kFormatter(value, precision);
+  const valueContent = valueMarkup
+    ? valueMarkup
+    : `${valuePrefix ?? ""}${kValue}${unitSymbol ? ` ${unitSymbol}` : ""}`;
   const staggerDelay = (index + 3) * 150;
 
   const labelOffset = showIcons ? `x="25"` : "";
@@ -109,8 +122,8 @@ const createTextNode = ({
         class="stat ${bold ? " bold" : "not_bold"}"
         x="${(showIcons ? 140 : 120) + shiftValuePos}"
         y="12.5"
-        data-testid="${id}"
-      >${kValue}${unitSymbol ? ` ${unitSymbol}` : ""}</text>
+        data-testid="${id}"${valueColor ? `\n        style="fill: ${valueColor}"` : ""}
+      >${valueContent}</text>
     </g>
   `;
 };
@@ -422,12 +435,36 @@ const renderStatsCard = (stats, options = {}) => {
     id: "contribs",
   };
 
+  // Format line counts using the same number format/precision as other stats.
+  const linesPrecision =
+    typeof number_precision === "number" && !isNaN(number_precision)
+      ? clampValue(number_precision, 0, 2)
+      : undefined;
+  const formatLines = (value) =>
+    number_format.toLowerCase() === "long"
+      ? value
+      : kFormatter(value, linesPrecision);
+
+  // Combined "+added -removed" on a single line (GitHub diff colors).
+  if (show.includes("lines_changed")) {
+    const added = formatLines(linesAdded);
+    const removed = formatLines(linesRemoved);
+    STATS.lines_changed = {
+      icon: icons.lines_changed,
+      label: tWithFallback("statcard.lines-changed"),
+      value: `+${added} -${removed}`,
+      id: "lines_changed",
+      valueMarkup: `<tspan style="fill: ${LINES_ADDED_COLOR}">+${added}</tspan> <tspan style="fill: ${LINES_REMOVED_COLOR}">-${removed}</tspan>`,
+    };
+  }
   if (show.includes("lines_added")) {
     STATS.lines_added = {
       icon: icons.lines_added,
       label: tWithFallback("statcard.lines-added"),
       value: linesAdded,
       id: "lines_added",
+      valueColor: LINES_ADDED_COLOR,
+      valuePrefix: "+",
     };
   }
   if (show.includes("lines_removed")) {
@@ -436,6 +473,8 @@ const renderStatsCard = (stats, options = {}) => {
       label: tWithFallback("statcard.lines-removed"),
       value: linesRemoved,
       id: "lines_removed",
+      valueColor: LINES_REMOVED_COLOR,
+      valuePrefix: "-",
     };
   }
   if (show.includes("github_actions")) {
@@ -470,6 +509,9 @@ const renderStatsCard = (stats, options = {}) => {
         bold: text_bold,
         numberFormat: number_format,
         numberPrecision: number_precision,
+        valueColor: stats.valueColor,
+        valuePrefix: stats.valuePrefix,
+        valueMarkup: stats.valueMarkup,
       });
     });
 

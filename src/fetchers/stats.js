@@ -471,8 +471,6 @@ const totalCommitsFetcher = async (username) => {
  * @param {boolean} include_discussions Include discussions.
  * @param {boolean} include_discussions_answers Include discussions answers.
  * @param {number|undefined} commits_year Year to count total commits
- * @param {boolean} include_lines_changed Include lines of code added/removed.
- * @param {boolean} include_github_actions Include GitHub Actions runs count.
  * @returns {Promise<import("./types").StatsData>} Stats data.
  */
 const fetchStats = async (
@@ -483,8 +481,6 @@ const fetchStats = async (
   include_discussions = false,
   include_discussions_answers = false,
   commits_year,
-  include_lines_changed = false,
-  include_github_actions = false,
 ) => {
   if (!username) {
     throw new MissingParamError(["username"]);
@@ -578,9 +574,11 @@ const fetchStats = async (
       return prev + curr.stargazers.totalCount;
     }, 0);
 
-  // These stats are expensive (one REST call per repository) and have no
-  // aggregate GitHub API endpoint, so they are only computed on demand.
-  if (include_lines_changed || include_github_actions) {
+  // Lines of code changed and GitHub Actions runs feed into the rank, so they
+  // are always computed. They are expensive (one REST call per repository) and
+  // have no aggregate GitHub API endpoint, so a failure degrades to 0 instead
+  // of breaking the whole card.
+  try {
     const token = process.env.PAT_1;
     let repos = await fetchUserRepositories(username);
     if (repos.length > MAX_REPOS_FOR_DETAILED_STATS) {
@@ -590,22 +588,15 @@ const fetchStats = async (
       repos = repos.slice(0, MAX_REPOS_FOR_DETAILED_STATS);
     }
 
-    if (include_lines_changed) {
-      const { additions, deletions } = await fetchLinesOfCode(
-        username,
-        repos,
-        token,
-      );
-      stats.linesAdded = additions;
-      stats.linesRemoved = deletions;
-    }
-    if (include_github_actions) {
-      stats.totalGithubActions = await fetchGithubActions(
-        username,
-        repos,
-        token,
-      );
-    }
+    const [loc, actions] = await Promise.all([
+      fetchLinesOfCode(username, repos, token),
+      fetchGithubActions(username, repos, token),
+    ]);
+    stats.linesAdded = loc.additions;
+    stats.linesRemoved = loc.deletions;
+    stats.totalGithubActions = actions;
+  } catch (err) {
+    logger.log(`Could not fetch detailed stats for ${username}: ${err}`);
   }
 
   stats.rank = calculateRank({
@@ -617,6 +608,8 @@ const fetchStats = async (
     repos: user.repositories.totalCount,
     stars: stats.totalStars,
     followers: user.followers.totalCount,
+    lines_changed: stats.linesAdded + stats.linesRemoved,
+    github_actions: stats.totalGithubActions,
   });
 
   return stats;

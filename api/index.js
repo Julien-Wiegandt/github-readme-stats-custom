@@ -94,8 +94,6 @@ export default async (req, res) => {
       showStats.includes("discussions_started"),
       showStats.includes("discussions_answered"),
       parseInt(commits_year, 10),
-      showStats.includes("lines_added") || showStats.includes("lines_removed"),
-      showStats.includes("github_actions"),
     );
     const cacheSeconds = resolveCacheSeconds({
       requested: parseInt(cache_seconds, 10),
