@@ -22,6 +22,9 @@ const stats = {
   totalDiscussionsStarted: 10,
   totalDiscussionsAnswered: 50,
   contributedTo: 500,
+  linesAdded: 12345,
+  linesRemoved: 6789,
+  totalGithubActions: 600,
   rank: { level: "A+", percentile: 40 },
 };
 
@@ -55,6 +58,13 @@ describe("Test renderStatsCard", () => {
     expect(queryByTestId(document.body, "prs_merged")).not.toBeInTheDocument();
     expect(
       queryByTestId(document.body, "prs_merged_percentage"),
+    ).not.toBeInTheDocument();
+    expect(queryByTestId(document.body, "lines_added")).not.toBeInTheDocument();
+    expect(
+      queryByTestId(document.body, "lines_removed"),
+    ).not.toBeInTheDocument();
+    expect(
+      queryByTestId(document.body, "github_actions"),
     ).not.toBeInTheDocument();
   });
 
@@ -118,6 +128,20 @@ describe("Test renderStatsCard", () => {
     expect(queryByTestId(document.body, "discussions_answered")).toBeDefined();
     expect(queryByTestId(document.body, "prs_merged")).toBeDefined();
     expect(queryByTestId(document.body, "prs_merged_percentage")).toBeDefined();
+  });
+
+  it("should show lines of code and GitHub Actions stats", () => {
+    document.body.innerHTML = renderStatsCard(stats, {
+      show: ["lines_added", "lines_removed", "github_actions"],
+    });
+
+    expect(getByTestId(document.body, "lines_added").textContent).toBe("12.3k");
+    expect(getByTestId(document.body, "lines_removed").textContent).toBe(
+      "6.8k",
+    );
+    expect(getByTestId(document.body, "github_actions").textContent).toBe(
+      "600",
+    );
   });
 
   it("should hide_rank", () => {

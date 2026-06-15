@@ -351,6 +351,18 @@ const statCardLocales = ({ name, apostrophe }) => {
       "sr-latn": "Doprinosi (prošla godina)",
       no: "Bidro til (i fjor)",
     },
+    "statcard.lines-added": {
+      en: "Lines of code added",
+      fr: "Lignes de code ajoutées",
+    },
+    "statcard.lines-removed": {
+      en: "Lines of code removed",
+      fr: "Lignes de code supprimées",
+    },
+    "statcard.github-actions": {
+      en: "GitHub Actions run",
+      fr: "GitHub Actions exécutées",
+    },
     "statcard.reviews": {
       en: "Total PRs Reviewed",
       ar: "طلبات السحب التي تم مراجعتها",

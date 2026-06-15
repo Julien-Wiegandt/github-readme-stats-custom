@@ -136,7 +136,10 @@ You can pass a query parameter `&hide=` to hide any specific stats with comma-se
 
 You can pass a query parameter `&show=` to show any specific additional stats with comma-separated values.
 
-> Options: `&show=reviews,discussions_started,discussions_answered,prs_merged,prs_merged_percentage`
+> Options: `&show=reviews,discussions_started,discussions_answered,prs_merged,prs_merged_percentage,lines_added,lines_removed,github_actions`
+
+> [!NOTE]\
+> `lines_added`, `lines_removed` and `github_actions` aggregate data across every repository you own and have contributed to, using one GitHub REST request per repository. They are noticeably slower and more rate-limit intensive than the other stats, so they are only computed when explicitly requested via `&show=`.
 
 ```md
 ![Anurag's GitHub stats](https://github-readme-stats.vercel.app/api?username=anuraghazra&show=reviews,discussions_started,discussions_answered,prs_merged,prs_merged_percentage)
@@ -383,7 +386,7 @@ If we don't support your language, please consider contributing! You can find mo
 | `ring_color` | Color of the rank circle. | string (hex color) | `2f80ed` |
 | `number_format` | Switches between two available formats for displaying the card values `short` (i.e. `6.6k`) and `long` (i.e. `6626`). | enum | `short` |
 | `number_precision` | Enforce the number of digits after the decimal point for `short` number format. Must be an integer between 0 and 2. Will be ignored for `long` number format. | integer (0, 1 or 2) | `null` |
-| `show` | Shows [additional items](#showing-additional-individual-stats) on stats card (i.e. `reviews`, `discussions_started`, `discussions_answered`, `prs_merged` or `prs_merged_percentage`). | string (comma-separated values) | `null` |
+| `show` | Shows [additional items](#showing-additional-individual-stats) on stats card (i.e. `reviews`, `discussions_started`, `discussions_answered`, `prs_merged`, `prs_merged_percentage`, `lines_added`, `lines_removed` or `github_actions`). | string (comma-separated values) | `null` |
 | `commits_year` | Filters and counts only commits made in the specified year. | integer _(YYYY)_ | `<current year> (one year to date)` |
 
 > [!WARNING]

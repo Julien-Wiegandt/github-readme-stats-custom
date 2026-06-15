@@ -142,6 +142,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -178,6 +181,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -220,6 +226,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 1000,
       totalIssues: 200,
@@ -269,6 +278,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 1000,
       totalIssues: 200,
@@ -300,6 +312,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -331,6 +346,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -362,6 +380,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -391,6 +412,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -420,6 +444,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,
@@ -458,6 +485,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 428,
       totalIssues: 200,
@@ -491,6 +521,9 @@ describe("Test fetchStats", () => {
 
     expect(stats).toStrictEqual({
       contributedTo: 61,
+      linesAdded: 0,
+      linesRemoved: 0,
+      totalGithubActions: 0,
       name: "Anurag Hazra",
       totalCommits: 100,
       totalIssues: 200,

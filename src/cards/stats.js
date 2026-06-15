@@ -267,6 +267,9 @@ const renderStatsCard = (stats, options = {}) => {
     totalDiscussionsStarted,
     totalDiscussionsAnswered,
     contributedTo,
+    linesAdded,
+    linesRemoved,
+    totalGithubActions,
     rank,
   } = stats;
   const {
@@ -319,6 +322,16 @@ const renderStatsCard = (stats, options = {}) => {
       ...wakatimeCardLocales,
     },
   });
+
+  // Some optional stats only ship with a subset of locales; fall back to the
+  // English label instead of throwing when the requested locale is missing.
+  const tWithFallback = (key) => {
+    try {
+      return i18n.t(key);
+    } catch {
+      return new I18n({ locale: "en", translations: i18n.translations }).t(key);
+    }
+  };
 
   // Meta data for creating text nodes with createTextNode function
   const STATS = {};
@@ -408,6 +421,31 @@ const renderStatsCard = (stats, options = {}) => {
     value: contributedTo,
     id: "contribs",
   };
+
+  if (show.includes("lines_added")) {
+    STATS.lines_added = {
+      icon: icons.lines_added,
+      label: tWithFallback("statcard.lines-added"),
+      value: linesAdded,
+      id: "lines_added",
+    };
+  }
+  if (show.includes("lines_removed")) {
+    STATS.lines_removed = {
+      icon: icons.lines_removed,
+      label: tWithFallback("statcard.lines-removed"),
+      value: linesRemoved,
+      id: "lines_removed",
+    };
+  }
+  if (show.includes("github_actions")) {
+    STATS.github_actions = {
+      icon: icons.github_actions,
+      label: tWithFallback("statcard.github-actions"),
+      value: totalGithubActions,
+      id: "github_actions",
+    };
+  }
 
   // @ts-ignore
   const isLongLocale = locale ? LONG_LOCALES.includes(locale) : false;
