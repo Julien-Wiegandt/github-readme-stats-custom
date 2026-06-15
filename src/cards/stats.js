@@ -89,7 +89,8 @@ const createTextNode = ({
   numberPrecision,
   valueColor,
   valuePrefix,
-  valueMarkup,
+  valueLines,
+  lineHeight,
 }) => {
   const precision =
     typeof numberPrecision === "number" && !isNaN(numberPrecision)
@@ -99,10 +100,21 @@ const createTextNode = ({
     numberFormat.toLowerCase() === "long" || id === "prs_merged_percentage"
       ? value
       : kFormatter(value, precision);
-  const valueContent = valueMarkup
-    ? valueMarkup
-    : `${valuePrefix ?? ""}${kValue}${unitSymbol ? ` ${unitSymbol}` : ""}`;
   const staggerDelay = (index + 3) * 150;
+
+  const valueX = (showIcons ? 140 : 120) + shiftValuePos;
+  // Multi-line values (e.g. stacked "+added" / "-removed") are rendered as
+  // tspans, each pushed onto its own line with `dy` and aligned at `valueX`.
+  const valueContent = valueLines
+    ? valueLines
+        .map(
+          (line, i) =>
+            `<tspan x="${valueX}"${
+              i ? ` dy="${lineHeight}"` : ""
+            } style="fill: ${line.color}">${line.text}</tspan>`,
+        )
+        .join("")
+    : `${valuePrefix ?? ""}${kValue}${unitSymbol ? ` ${unitSymbol}` : ""}`;
 
   const labelOffset = showIcons ? `x="25"` : "";
   const iconSvg = showIcons
@@ -120,7 +132,7 @@ const createTextNode = ({
       }" ${labelOffset} y="12.5">${label}:</text>
       <text
         class="stat ${bold ? " bold" : "not_bold"}"
-        x="${(showIcons ? 140 : 120) + shiftValuePos}"
+        x="${valueX}"
         y="12.5"
         data-testid="${id}"${valueColor ? `\n        style="fill: ${valueColor}"` : ""}
       >${valueContent}</text>
@@ -365,6 +377,17 @@ const renderStatsCard = (stats, options = {}) => {
     value: totalCommits,
     id: "commits",
   };
+
+  // GitHub Actions runs are placed right after commits (2nd position).
+  if (show.includes("github_actions")) {
+    STATS.github_actions = {
+      icon: icons.github_actions,
+      label: tWithFallback("statcard.github-actions"),
+      value: totalGithubActions,
+      id: "github_actions",
+    };
+  }
+
   STATS.prs = {
     icon: icons.prs,
     label: i18n.t("statcard.prs"),
@@ -445,7 +468,9 @@ const renderStatsCard = (stats, options = {}) => {
       ? value
       : kFormatter(value, linesPrecision);
 
-  // Combined "+added -removed" on a single line (GitHub diff colors).
+  // Combined added/removed stacked on two lines (GitHub diff colors):
+  //   +added
+  //   -removed
   if (show.includes("lines_changed")) {
     const added = formatLines(linesAdded);
     const removed = formatLines(linesRemoved);
@@ -454,7 +479,11 @@ const renderStatsCard = (stats, options = {}) => {
       label: tWithFallback("statcard.lines-changed"),
       value: `+${added} -${removed}`,
       id: "lines_changed",
-      valueMarkup: `<tspan style="fill: ${LINES_ADDED_COLOR}">+${added}</tspan> <tspan style="fill: ${LINES_REMOVED_COLOR}">-${removed}</tspan>`,
+      valueLines: [
+        { text: `+${added}`, color: LINES_ADDED_COLOR },
+        { text: `-${removed}`, color: LINES_REMOVED_COLOR },
+      ],
+      extraLines: 1,
     };
   }
   if (show.includes("lines_added")) {
@@ -477,43 +506,42 @@ const renderStatsCard = (stats, options = {}) => {
       valuePrefix: "-",
     };
   }
-  if (show.includes("github_actions")) {
-    STATS.github_actions = {
-      icon: icons.github_actions,
-      label: tWithFallback("statcard.github-actions"),
-      value: totalGithubActions,
-      id: "github_actions",
-    };
-  }
 
   // @ts-ignore
   const isLongLocale = locale ? LONG_LOCALES.includes(locale) : false;
 
   // filter out hidden stats defined by user & create the text nodes
-  const statItems = Object.keys(STATS)
-    .filter((key) => !hide.includes(key))
-    .map((key, index) => {
-      // @ts-ignore
-      const stats = STATS[key];
+  const visibleStats = Object.keys(STATS).filter((key) => !hide.includes(key));
+  const statItems = visibleStats.map((key, index) => {
+    // @ts-ignore
+    const stats = STATS[key];
 
-      // create the text nodes, and pass index so that we can calculate the line spacing
-      return createTextNode({
-        icon: stats.icon,
-        label: stats.label,
-        value: stats.value,
-        id: stats.id,
-        unitSymbol: stats.unitSymbol,
-        index,
-        showIcons: show_icons,
-        shiftValuePos: 79.01 + (isLongLocale ? 50 : 0),
-        bold: text_bold,
-        numberFormat: number_format,
-        numberPrecision: number_precision,
-        valueColor: stats.valueColor,
-        valuePrefix: stats.valuePrefix,
-        valueMarkup: stats.valueMarkup,
-      });
+    // create the text nodes, and pass index so that we can calculate the line spacing
+    return createTextNode({
+      icon: stats.icon,
+      label: stats.label,
+      value: stats.value,
+      id: stats.id,
+      unitSymbol: stats.unitSymbol,
+      index,
+      showIcons: show_icons,
+      shiftValuePos: 79.01 + (isLongLocale ? 50 : 0),
+      bold: text_bold,
+      numberFormat: number_format,
+      numberPrecision: number_precision,
+      valueColor: stats.valueColor,
+      valuePrefix: stats.valuePrefix,
+      valueLines: stats.valueLines,
+      lineHeight: lheight,
     });
+  });
+
+  // Extra line height consumed by multi-line stats (e.g. stacked lines_changed).
+  const statSizes = visibleStats.map(
+    // @ts-ignore
+    (key) => (STATS[key].extraLines || 0) * lheight,
+  );
+  const extraLinesTotal = statSizes.reduce((sum, size) => sum + size, 0);
 
   if (statItems.length === 0 && hide_rank) {
     throw new CustomError(
@@ -525,7 +553,7 @@ const renderStatsCard = (stats, options = {}) => {
   // Calculate the card height depending on how many items there are
   // but if rank circle is visible clamp the minimum height to `150`
   let height = Math.max(
-    45 + (statItems.length + 1) * lheight,
+    45 + (statItems.length + 1) * lheight + extraLinesTotal,
     hide_rank ? 0 : statItems.length ? 150 : 180,
   );
 
@@ -673,6 +701,7 @@ const renderStatsCard = (stats, options = {}) => {
         items: statItems,
         gap: lheight,
         direction: "column",
+        sizes: statSizes,
       }).join("")}
     </svg>
   `);

@@ -148,19 +148,24 @@ describe("Test renderStatsCard", () => {
     );
   });
 
-  it("should show combined lines changed on a single line", () => {
+  it("should show combined lines changed stacked on two lines", () => {
     document.body.innerHTML = renderStatsCard(stats, {
       show: ["lines_changed"],
     });
 
     const linesChanged = getByTestId(document.body, "lines_changed");
-    expect(linesChanged.textContent).toBe("+12.3k -6.8k");
 
-    // Each part keeps its own GitHub diff color via tspans.
+    // Two stacked tspans, each with its own GitHub diff color.
     const tspans = linesChanged.getElementsByTagName("tspan");
     expect(tspans).toHaveLength(2);
+    expect(tspans[0].textContent).toBe("+12.3k");
     expect(tspans[0]).toHaveStyle("fill: #2da44e");
+    expect(tspans[1].textContent).toBe("-6.8k");
     expect(tspans[1]).toHaveStyle("fill: #cf222e");
+
+    // The second line is pushed below the first via `dy`, aligned at the same x.
+    expect(tspans[1].getAttribute("dy")).not.toBeNull();
+    expect(tspans[0].getAttribute("x")).toBe(tspans[1].getAttribute("x"));
 
     // Individual lines are not rendered when only the combined stat is shown.
     expect(queryByTestId(document.body, "lines_added")).not.toBeInTheDocument();
