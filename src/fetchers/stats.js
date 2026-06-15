@@ -163,6 +163,20 @@ const statsFetcher = async ({
 // usage for users with a very large number of repositories.
 const MAX_REPOS_FOR_DETAILED_STATS = 300;
 
+// Number of repositories processed concurrently for detailed stats.
+const DETAILED_STATS_CONCURRENCY = 12;
+
+// Soft time budget (ms) for the detailed-stats phase. Once exceeded, no new
+// per-repo requests are launched and whatever was collected so far is used.
+// Kept well below the serverless function `maxDuration` so the card always
+// renders instead of timing out.
+const DETAILED_STATS_BUDGET_MS = Number(
+  process.env.DETAILED_STATS_BUDGET_MS || 45000,
+);
+
+// Per-request timeout (ms) so a single slow repository cannot stall the batch.
+const DETAILED_STATS_REQUEST_TIMEOUT_MS = 8000;
+
 // GraphQL query to list the repositories owned by a user (paginated).
 const GRAPHQL_OWNED_REPO_NAMES_QUERY = `
   query userRepoNames($login: String!, $after: String) {
@@ -198,27 +212,25 @@ const GRAPHQL_CONTRIB_REPO_NAMES_QUERY = `
 `;
 
 /**
- * Pause execution for a given number of milliseconds.
- *
- * @param {number} ms Milliseconds to sleep.
- * @returns {Promise<void>} Promise that resolves after the delay.
- */
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Run an async task over a list of items with a bounded concurrency.
+ * Run an async task over a list of items with a bounded concurrency and an
+ * optional deadline. Once the deadline passes, no new items are started and
+ * the remaining results stay `null`.
  *
  * @template T, R
  * @param {T[]} items Items to process.
  * @param {number} limit Maximum number of concurrent tasks.
  * @param {(item: T, index: number) => Promise<R>} task Task to run per item.
- * @returns {Promise<R[]>} Results in the same order as the input items.
+ * @param {number=} deadline Epoch ms after which no new task is started.
+ * @returns {Promise<(R|null)[]>} Results in the same order as the input items.
  */
-const mapWithConcurrency = async (items, limit, task) => {
-  const results = new Array(items.length);
+const mapWithConcurrency = async (items, limit, task, deadline) => {
+  const results = new Array(items.length).fill(null);
   let cursor = 0;
   const worker = async () => {
     while (cursor < items.length) {
+      if (deadline && Date.now() >= deadline) {
+        return;
+      }
       const index = cursor++;
       results[index] = await task(items[index], index);
     }
@@ -283,19 +295,11 @@ const fetchUserRepositories = async (username) => {
  * @param {string} nameWithOwner Repository identifier ("owner/name").
  * @param {string} username GitHub username.
  * @param {string} token GitHub token.
- * @param {number} retries Current retry count (the stats endpoint returns 202
- *   while GitHub computes the statistics).
  * @returns {Promise<{additions: number, deletions: number}>} Lines changed.
  *
  * @see https://docs.github.com/en/rest/metrics/statistics#get-all-contributor-commit-activity
  */
-const fetchRepoLinesOfCode = async (
-  nameWithOwner,
-  username,
-  token,
-  retries = 0,
-) => {
-  const MAX_202_RETRIES = 3;
+const fetchRepoLinesOfCode = async (nameWithOwner, username, token) => {
   const empty = { additions: 0, deletions: 0 };
   let res;
   try {
@@ -306,22 +310,18 @@ const fetchRepoLinesOfCode = async (
         Accept: "application/vnd.github+json",
         Authorization: `token ${token}`,
       },
+      timeout: DETAILED_STATS_REQUEST_TIMEOUT_MS,
     });
   } catch {
     // Skip repositories we cannot access (e.g. revoked permissions).
     return empty;
   }
 
-  // 202 means GitHub is still computing the statistics; back off and retry.
-  if (res.status === 202) {
-    if (retries >= MAX_202_RETRIES) {
-      return empty;
-    }
-    await sleep(2000);
-    return fetchRepoLinesOfCode(nameWithOwner, username, token, retries + 1);
-  }
-
-  if (!Array.isArray(res.data)) {
+  // 202 means GitHub is still computing the statistics. We intentionally do not
+  // block waiting for it: issuing the request triggers the computation, so a
+  // later (cached) render will pick up the real numbers without risking a
+  // serverless timeout now.
+  if (res.status === 202 || !Array.isArray(res.data)) {
     return empty;
   }
 
@@ -362,6 +362,7 @@ const fetchRepoActionRuns = async (nameWithOwner, username, token) => {
         Accept: "application/vnd.github+json",
         Authorization: `token ${token}`,
       },
+      timeout: DETAILED_STATS_REQUEST_TIMEOUT_MS,
     });
     return res.data.total_count || 0;
   } catch {
@@ -371,40 +372,36 @@ const fetchRepoActionRuns = async (nameWithOwner, username, token) => {
 };
 
 /**
- * Aggregate lines of code added/removed by a user across the given repositories.
+ * Aggregate lines of code changed and GitHub Actions runs across the given
+ * repositories in a single bounded-concurrency pass with a time budget.
  *
  * @param {string} username GitHub username.
  * @param {string[]} repos List of "owner/name" identifiers.
  * @param {string} token GitHub token.
- * @returns {Promise<{additions: number, deletions: number}>} Aggregated totals.
+ * @returns {Promise<{additions: number, deletions: number, actions: number}>} Aggregated totals.
  */
-const fetchLinesOfCode = async (username, repos, token) => {
-  const perRepo = await mapWithConcurrency(repos, 10, (repo) =>
-    fetchRepoLinesOfCode(repo, username, token),
+const fetchDetailedRepoStats = async (username, repos, token) => {
+  const deadline = Date.now() + DETAILED_STATS_BUDGET_MS;
+  const perRepo = await mapWithConcurrency(
+    repos,
+    DETAILED_STATS_CONCURRENCY,
+    async (repo) => {
+      const [loc, actions] = await Promise.all([
+        fetchRepoLinesOfCode(repo, username, token),
+        fetchRepoActionRuns(repo, username, token),
+      ]);
+      return { ...loc, actions };
+    },
+    deadline,
   );
-  return perRepo.reduce(
-    (acc, { additions, deletions }) => ({
-      additions: acc.additions + additions,
-      deletions: acc.deletions + deletions,
+  return perRepo.filter(Boolean).reduce(
+    (acc, r) => ({
+      additions: acc.additions + r.additions,
+      deletions: acc.deletions + r.deletions,
+      actions: acc.actions + r.actions,
     }),
-    { additions: 0, deletions: 0 },
+    { additions: 0, deletions: 0, actions: 0 },
   );
-};
-
-/**
- * Aggregate the number of GitHub Actions runs a user triggered across the given
- * repositories.
- *
- * @param {string} username GitHub username.
- * @param {string[]} repos List of "owner/name" identifiers.
- * @param {string} token GitHub token.
- * @returns {Promise<number>} Total workflow runs triggered by the user.
- */
-const fetchGithubActions = async (username, repos, token) => {
-  const perRepo = await mapWithConcurrency(repos, 10, (repo) =>
-    fetchRepoActionRuns(repo, username, token),
-  );
-  return perRepo.reduce((acc, count) => acc + count, 0);
 };
 
 /**
@@ -588,13 +585,10 @@ const fetchStats = async (
       repos = repos.slice(0, MAX_REPOS_FOR_DETAILED_STATS);
     }
 
-    const [loc, actions] = await Promise.all([
-      fetchLinesOfCode(username, repos, token),
-      fetchGithubActions(username, repos, token),
-    ]);
-    stats.linesAdded = loc.additions;
-    stats.linesRemoved = loc.deletions;
-    stats.totalGithubActions = actions;
+    const detailed = await fetchDetailedRepoStats(username, repos, token);
+    stats.linesAdded = detailed.additions;
+    stats.linesRemoved = detailed.deletions;
+    stats.totalGithubActions = detailed.actions;
   } catch (err) {
     logger.log(`Could not fetch detailed stats for ${username}: ${err}`);
   }
